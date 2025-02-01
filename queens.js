@@ -1,69 +1,102 @@
 // Solver for LinkedIn's Queens game
-// Instructions: solve(generateBoard(BOARD, []))
-// (optionally pass in an array of known queen positions as the second argument to generateBoard)
+// Instructions: solve(initialiseBoard(BOARD, []))
+// (optionally pass in an array of known queen positions as the second argument to initialiseBoard)
 // Rules:
 // - place 1 queen in each row, column, and region
 // - queens cannot be adjacent to each other (including diagonals)
 
-const HEIGHT = 8;
-const WIDTH = 8;
-const BOARD = [
-  0, 0, 0, 0, 0, 0, 0, 0,
-  0, 1, 1, 2, 0, 0, 0, 0,
-  1, 1, 2, 2, 3, 4, 4, 0,
-  5, 5, 2, 3, 3, 4, 0, 0,
-  5, 5, 5, 5, 3, 6, 6, 0,
-  5, 5, 5, 5, 5, 5, 6, 0,
-  5, 5, 5, 5, 5, 5, 7, 7,
-  5, 5, 5, 5, 5, 5, 5, 7,
-];
-// const BOARD = [
-//   0, 0, 0, 0, 0, 0, 0, 0, 0,
-//   1, 0, 0, 0, 0, 0, 0, 0, 0,
-//   1, 0, 0, 0, 0, 0, 2, 0, 0,
-//   1, 3, 3, 3, 3, 0, 2, 2, 2,
-//   1, 1, 4, 3, 3, 0, 5, 5, 5,
-//   6, 1, 4, 3, 3, 0, 5, 7, 7,
-//   6, 1, 4, 8, 3, 0, 5, 5, 7,
-//   6, 1, 4, 8, 3, 0, 5, 7, 7,
-//   6, 6, 4, 8, 8, 8, 5, 5, 5,
-// ];
-// const BOARD = [
-//   0, 1, 2, 2, 2, 3, 3, 3, 3, 3,
-//   0, 1, 1, 2, 2, 3, 3, 3, 4, 4,
-//   0, 1, 1, 2, 2, 5, 3, 3, 3, 4,
-//   0, 0, 1, 2, 2, 5, 3, 3, 3, 4,
-//   1, 0, 1, 2, 2, 5, 5, 3, 3, 4,
-//   1, 1, 1, 2, 2, 6, 5, 3, 3, 4,
-//   1, 1, 1, 1, 2, 6, 6, 4, 4, 4,
-//   7, 2, 2, 2, 2, 9, 9, 4, 4, 4,
-//   7, 2, 8, 2, 2, 9, 9, 4, 4, 9,
-//   7, 7, 8, 8, 2, 9, 9, 9, 9, 9,
-// ];
+// -----------------------------------------------------------------------------
+// CONSTANTS
+// -----------------------------------------------------------------------------
+
+const BOARD_1 = {
+  width: 8,
+  height: 8,
+  cells: [
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 1, 1, 2, 0, 0, 0, 0,
+    1, 1, 2, 2, 3, 4, 4, 0,
+    5, 5, 2, 3, 3, 4, 0, 0,
+    5, 5, 5, 5, 3, 6, 6, 0,
+    5, 5, 5, 5, 5, 5, 6, 0,
+    5, 5, 5, 5, 5, 5, 7, 7,
+    5, 5, 5, 5, 5, 5, 5, 7,
+  ],
+};
+const BOARD_2 = {
+  width: 9,
+  height: 9,
+  cells: [
+    0, 0, 0, 0, 0, 0, 0, 0, 0,
+    1, 0, 0, 0, 0, 0, 0, 0, 0,
+    1, 0, 0, 0, 0, 0, 2, 0, 0,
+    1, 3, 3, 3, 3, 0, 2, 2, 2,
+    1, 1, 4, 3, 3, 0, 5, 5, 5,
+    6, 1, 4, 3, 3, 0, 5, 7, 7,
+    6, 1, 4, 8, 3, 0, 5, 5, 7,
+    6, 1, 4, 8, 3, 0, 5, 7, 7,
+    6, 6, 4, 8, 8, 8, 5, 5, 5,
+  ],
+};
+const BOARD_3 = {
+  width: 10,
+  height: 10,
+  cells: [
+    0, 1, 2, 2, 2, 3, 3, 3, 3, 3,
+    0, 1, 1, 2, 2, 3, 3, 3, 4, 4,
+    0, 1, 1, 2, 2, 5, 3, 3, 3, 4,
+    0, 0, 1, 2, 2, 5, 3, 3, 3, 4,
+    1, 0, 1, 2, 2, 5, 5, 3, 3, 4,
+    1, 1, 1, 2, 2, 6, 5, 3, 3, 4,
+    1, 1, 1, 1, 2, 6, 6, 4, 4, 4,
+    7, 2, 2, 2, 2, 9, 9, 4, 4, 4,
+    7, 2, 8, 2, 2, 9, 9, 4, 4, 9,
+    7, 7, 8, 8, 2, 9, 9, 9, 9, 9,
+  ],
+};
+
 const COLOURS = [
   'red', 'green', 'blue', 'purple', 'orange', 'lime', 'yellow', 'navy',
   'pink', 'cyan', 'teal', 'magenta', 'maroon', 'olive', 'silver', 'gray',
 ];
-const MAX_ITERATIONS = 100000;
+const MAX_SOLVER_ITERATIONS = 100000;
+const MAX_GENERATOR_ITERATIONS = 1000;
 const ANIMATE = false;
 
+// -----------------------------------------------------------------------------
+// UTILITIES
+// -----------------------------------------------------------------------------
+
 // Convert between positions { x: number, y: number } and indices
-const pos = i => ({ x: i % WIDTH, y: Math.floor(i / WIDTH) });
-const ind = ({ x, y }) => y * WIDTH + x;
+const pos = (i, width) => ({ x: i % width, y: Math.floor(i / width) });
+const ind = ({ x, y }, width) => y * width + x;
+
+// Generate a random int in the interval [min, max)
+const randomInt = (min, max) => Math.floor(Math.random() * (max - min)) + min;
 
 // Get an array of integers in the interval [0, n)
 const range = n => Array(n).fill(0).map((_, i) => i);
 
 // Check if a position is within the bounds of the board
-const positionInBounds = p => (
-  p.x >= 0 && p.x < WIDTH && p.y >= 0 && p.y < HEIGHT
+const positionInBounds = (p, width, height) => (
+  p.x >= 0 && p.x < width && p.y >= 0 && p.y < height
 );
 
-// Get a 3x3 area around a position
-const area = p => range(3).flatMap(y => range(3).map(x => ({
-  x: p.x + (x - 1),
-  y: p.y + (y - 1),
-}))).filter(positionInBounds);
+// Get a 3x3 area around a position (including the given position)
+const mooreNeighbourhood = (p, width, height) => range(3)
+  .flatMap(y => range(3).map(x => ({
+    x: p.x + (x - 1),
+    y: p.y + (y - 1),
+  })))
+  .filter(p => positionInBounds(p, width, height));
+
+// Get a 4-cell area around a position (including the given position)
+const vonNeumannNeighbourhood = (p, width, height) => [
+  { x: p.x, y: p.y - 1 },
+  { x: p.x - 1, y: p.y },
+  { x: p.x + 1, y: p.y },
+  { x: p.x, y: p.y + 1 },
+].filter(p => positionInBounds(p, width, height));
 
 // Count how many queens are in a set of cells
 // type cell => { r: number (region id), q: boolean (queen) }
@@ -73,39 +106,92 @@ const countQueens = cells => cells.filter(cell => cell.q).length;
 const hasOneQueen = cells => countQueens(cells) === 1;
 
 // Get a row of cells from a board
-const getRow = (board, y) => range(WIDTH).map(x => board[ind({ x, y })]);
+const getRow = (board, y) => range(board.width).map(
+  x => board.cells[ind({ x, y }, board.width)]
+);
 
 // Get a column of cells from a board
-const getColumn = (board, x) => range(HEIGHT).map(y => board[ind({ x, y })]);
+const getColumn = (board, x) => range(board.height).map(
+  y => board.cells[ind({ x, y }, board.width)]
+);
 
 // Group cells by region
 // returns { [regionId: number]: cell[] }
-const groupByRegion = board => board.reduce(
+const groupByRegion = board => board.cells.reduce(
   (a, c) => ({ ...a, [c.r]: [...(a[c.r] ?? []), c] }),
   {}
 );
 
 // Get the indices of all queens on the board
-const getQueens = board => board.reduce(
+const getQueens = board => board.cells.reduce(
   (a, c, i) => c.q ? [...a, i] : a, []
 );
 
 // Get the cells in the area around a queen
-const getQueenArea = (board, q) => area(pos(q)).map(p => board[ind(p)]);
+const getQueenArea = (board, q) => mooreNeighbourhood(
+  pos(q, board.width),
+  board.width,
+  board.height
+).map(p => board.cells[ind(p, board.width)]);
 
 // Clone a board state
-const cloneBoard = board => [...board.map(({ r, q }) => ({ r, q }))];
+const cloneBoard = board => ({
+  width: board.width,
+  height: board.height,
+  cells: [...board.cells.map(({ r, q }) => ({ r, q }))],
+});
 
-// Generate an unrolled list of cells from lists of regions and queen indices
-function generateBoard(regions, queens = []) {
-  const queenMap = queens.reduce((a, c) => ({ ...a, [c]: true, }), {});
-  return regions.map((r, i) => ({ r, q: !!queenMap[i] }));
+// Check if a list of cells has unassigned regions
+const hasUnassignedRegions = cells => cells.some(cell => cell.r === null);
+
+// Weighted random number generator
+const weightedRandom = w => {
+  let total = w.reduce((a, i) => a + i, 0), n = 0;
+  const r = Math.random() * total;
+  while (total > r) {
+    total -= w[n++];
+  }
+  return n - 1;
+};
+
+// Fisher-Yates shuffle
+const shuffle = a => {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = randomInt(0, i + 1);
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+
+// -----------------------------------------------------------------------------
+// GAME LOGIC
+// -----------------------------------------------------------------------------
+
+// Generate a board definition from a 1d array of regions and queen positions
+function initialiseBoard(width, height, regions, queens = []) {
+  const queenMap = queens
+    .map(q => ind(q, width))
+    .reduce((a, c) => ({ ...a, [c]: true, }), {});
+  return {
+    width,
+    height,
+    cells: regions.map((r, i) => ({ r, q: !!queenMap[i] })),
+  };
+}
+
+// Remove all queens from a board
+function resetBoard(board) {
+  return {
+    width: board.width,
+    height: board.height,
+    cells: board.cells.map(cell => ({ ...cell, q: false })),
+  };
 }
 
 // Generate a new board with a queen at the given position
 function addQueenAtPosition(board, p) {
   const clone = cloneBoard(board);
-  clone[ind(p)].q = true;
+  clone.cells[ind(p, board.width)].q = true;
   return clone;
 }
 
@@ -114,10 +200,10 @@ function checkWin(board) {
   const regions = groupByRegion(board);
   return (
     // All columns populated
-    range(WIDTH).every(x => hasOneQueen(getColumn(board, x))) &&
+    range(board.width).every(x => hasOneQueen(getColumn(board, x))) &&
 
     // All rows populated
-    range(HEIGHT).every(y => hasOneQueen(getRow(board, y))) &&
+    range(board.height).every(y => hasOneQueen(getRow(board, y))) &&
 
     // All regions populated
     Object.values(regions).every(r => hasOneQueen(r)) &&
@@ -129,15 +215,15 @@ function checkWin(board) {
 
 // Get a list of valid queen placements as an array of positions
 function getValidPlacements(board) {
-  const rows = range(HEIGHT).map(y => getRow(board, y));
-  const columns = range(WIDTH).map(x => getColumn(board, x));
+  const rows = range(board.height).map(y => getRow(board, y));
+  const columns = range(board.width).map(x => getColumn(board, x));
   const regions = groupByRegion(board);
-  return range(WIDTH * HEIGHT)
+  return range(board.width * board.height)
     .filter(i => {
-      const p = pos(i);
+      const p = pos(i, board.width);
       return (
         // No queen at this position
-        !board[i].q &&
+        !board.cells[i].q &&
 
         // No queens in this row
         countQueens(rows[p.y]) === 0 &&
@@ -146,14 +232,18 @@ function getValidPlacements(board) {
         countQueens(columns[p.x]) === 0 &&
 
         // No queens in this region
-        countQueens(regions[board[i].r]) === 0 &&
+        countQueens(regions[board.cells[i].r]) === 0 &&
 
         // No queens in this adjacency region
         countQueens(getQueenArea(board, i)) === 0
       );
     })
-    .map(i => pos(i));
+    .map(i => pos(i, board.width));
 }
+
+// -----------------------------------------------------------------------------
+// SOLVER
+// -----------------------------------------------------------------------------
 
 // Collapse any cells that must have a queen
 function collapse(board) {
@@ -162,7 +252,10 @@ function collapse(board) {
     .reduce(
       (a, c) => ({
         ...a,
-        [board[ind(c)].r]: [...(a[board[ind(c)].r] ?? []), c],
+        [board.cells[ind(c, board.width)].r]: [
+          ...(a[board.cells[ind(c, board.width)].r] ?? []),
+          c,
+        ],
       }),
       {}
     );
@@ -179,7 +272,7 @@ function collapse(board) {
 
 // State cache
 let seenStates = {};
-const hashState = state => state.map(({ r, q }) => `${r}_${q}`).join('|');
+const hashState = state => state.cells.map(({ r, q }) => `${r}_${q}`).join('|');
 const cacheState = state => { seenStates[hashState(state)] = true; }
 const hasSeenState = state => !!seenStates[hashState(state)];
 
@@ -192,7 +285,7 @@ async function solve(board) {
 
   // Iterate until the stack is empty...
   let iterations = 0;
-  while (++iterations <= MAX_ITERATIONS && stack.length) {
+  while (++iterations <= MAX_SOLVER_ITERATIONS && stack.length) {
     const currentVertex = stack.pop();
 
     // If this is a winning state, then we're done
@@ -202,23 +295,45 @@ async function solve(board) {
       return true;
     }
 
+    const t1 = getValidPlacements(currentVertex);
+
+    const t2 = t1.map(p => ({
+      move: p,
+      state: addQueenAtPosition(currentVertex, p),
+    }));
+
+    const t3 = t2.filter(adjacent => !hasSeenState(adjacent.state));
+
+    const t4 = t3.map(adjacent => ({
+      ...adjacent,
+      h: heuristic(adjacent.state, adjacent.move),
+    }));
+
+    const t5 = t4.sort((a, b) => b.h - a.h);
+
+    t5.forEach(adjacent => {
+      const collapsed = collapse(adjacent.state);
+      stack.push(collapsed);
+      cacheState(collapsed);
+    });
+
     // Cache adjacent vertices and push them onto the stack
-    getValidPlacements(currentVertex)
-      .map(p => ({
-        move: p,
-        state: addQueenAtPosition(currentVertex, p),
-      }))
-      .filter(adjacent => !hasSeenState(adjacent.state))
-      .map(adjacent => ({
-        ...adjacent,
-        h: heuristic(adjacent.state, adjacent.move),
-      }))
-      .sort((a, b) => b.h - a.h)
-      .forEach(adjacent => {
-        const collapsed = collapse(adjacent.state);
-        stack.push(collapsed);
-        cacheState(collapsed);
-      });
+    // getValidPlacements(currentVertex)
+    //   .map(p => ({
+    //     move: p,
+    //     state: addQueenAtPosition(currentVertex, p),
+    //   }))
+    //   .filter(adjacent => !hasSeenState(adjacent.state))
+    //   .map(adjacent => ({
+    //     ...adjacent,
+    //     h: heuristic(adjacent.state, adjacent.move),
+    //   }))
+    //   .sort((a, b) => b.h - a.h)
+    //   .forEach(adjacent => {
+    //     const collapsed = collapse(adjacent.state);
+    //     stack.push(collapsed);
+    //     cacheState(collapsed);
+    //   });
 
     if (ANIMATE) {
       render(currentVertex);
@@ -227,7 +342,7 @@ async function solve(board) {
   }
 
   // Game is not solvable or we didn't search long enough
-  console.log(`Not solvable`);
+  console.log('Failed to solve');
   return false;
 }
 
@@ -242,11 +357,15 @@ function heuristic(board, move) {
   const regionSizes = Object.values(groupByRegion(board)).map(
     region => region.length
   );
-  const regionThisMove = board[ind(move)].r;
+  const regionThisMove = board.cells[ind(move, board.width)].r;
   score += 100 / regionSizes[regionThisMove];
 
   return score;
 }
+
+// -----------------------------------------------------------------------------
+// RENDERING
+// -----------------------------------------------------------------------------
 
 // Helper function to sleep for a number of milliseconds
 async function sleep(ms) {
@@ -265,12 +384,17 @@ function render(board) {
   context.textAlign = 'center';
   context.textBaseline = 'middle';
 
-  const cellSize = { x: canvasWidth / WIDTH, y: canvasHeight / HEIGHT };
+  const cellSize = {
+    x: canvasWidth / board.width,
+    y: canvasHeight / board.height,
+  };
 
   // Regions
-  for (let y = 0; y < HEIGHT; y++) {
-    for (let x = 0; x < WIDTH; x++) {
-      context.fillStyle = COLOURS[board[ind({ x, y })].r % COLOURS.length];
+  for (let y = 0; y < board.height; y++) {
+    for (let x = 0; x < board.width; x++) {
+      context.fillStyle = COLOURS[
+        board.cells[ind({ x, y }, board.width)].r % COLOURS.length
+      ];
       context.fillRect(
         x * cellSize.x,
         y * cellSize.y,
@@ -282,14 +406,14 @@ function render(board) {
 
   // Grid
   context.strokeStyle = '#00000030';
-  for (let i = 0; i < WIDTH; i++) {
+  for (let i = 0; i < board.width; i++) {
     line(
       context,
       { x: i * cellSize.x, y: 0 },
       { x: i * cellSize.x, y: canvasHeight }
     );
   }
-  for (let i = 0; i < HEIGHT; i++) {
+  for (let i = 0; i < board.height; i++) {
     line(
       context,
       { x: 0, y: i * cellSize.y },
@@ -302,9 +426,9 @@ function render(board) {
   context.font = `${
     Math.floor(Math.min(cellSize.x, cellSize.y) / 2)
   }px sans-serif`;
-  for (let i = 0; i < WIDTH * HEIGHT; i++) {
-    const p = pos(i);
-    if (board[i].q) {
+  for (let i = 0; i < board.width * board.height; i++) {
+    const p = pos(i, board.width);
+    if (board.cells[i].q) {
       context.fillText(
         '👑',
         p.x * cellSize.x + cellSize.x / 2,
@@ -322,5 +446,67 @@ function line(context, a, b) {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  render(generateBoard(BOARD));
+  render(initialiseBoard(BOARD_1.width, BOARD_1.height, BOARD_1.cells));
 });
+
+// -----------------------------------------------------------------------------
+// Generator
+// -----------------------------------------------------------------------------
+
+// Generate a random game
+function generateGame(size) {
+  const result = range(size * size).map(() => ({ r: null, growthRate: 0 }));
+
+  // Generate random positions, regions, and growth rates for the N queens
+  shuffle(range(size)).forEach((x, y) => {
+    const p = { x, y };
+    const i = ind(p, size);
+
+    result[i].r = y;
+    result[i].q = true;
+    result[i].growthRate = Math.random();
+  });
+
+  // Iterate until every cell has been assigned a region
+  let iterations = 0;
+  while (
+    hasUnassignedRegions(result) &&
+    iterations++ < MAX_GENERATOR_ITERATIONS
+  ) {
+    // Find all unassigned cells adjacent to assigned cells
+    const unassigned = result
+      .map((cell, i) => ({ ...cell, i }))
+      .filter(cell => cell.r === null)
+      .map(cell => {
+        const p = pos(cell.i, size);
+        return {
+          ...cell,
+          neighbours: [
+            { x: p.x - 1, y: p.y },
+            { x: p.x + 1, y: p.y },
+            { x: p.x, y: p.y - 1 },
+            { x: p.x, y: p.y + 1 },
+          ]
+            .filter(p => positionInBounds(p, size, size))
+            .map(p => result[ind(p, size)]),
+        };
+      })
+      .filter(cell => cell.neighbours.some(n => n.r !== null));
+
+    // Pick a random unassigned cell
+    const current = unassigned[randomInt(0, unassigned.length)];
+
+    // Assign the cell to the adjacent region with the highest growth rate
+    const neighbour = current.neighbours[
+      weightedRandom(current.neighbours.map(n => n.growthRate))
+    ];
+    result[current.i].r = neighbour.r;
+    result[current.i].growthRate = neighbour.growthRate;
+  }
+
+  return {
+    width: size,
+    height: size,
+    cells: result.map(({ r, q }) => ({ r, q })),
+  };
+}
