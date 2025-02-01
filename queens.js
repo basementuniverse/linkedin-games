@@ -295,45 +295,23 @@ async function solve(board) {
       return true;
     }
 
-    const t1 = getValidPlacements(currentVertex);
-
-    const t2 = t1.map(p => ({
-      move: p,
-      state: addQueenAtPosition(currentVertex, p),
-    }));
-
-    const t3 = t2.filter(adjacent => !hasSeenState(adjacent.state));
-
-    const t4 = t3.map(adjacent => ({
-      ...adjacent,
-      h: heuristic(adjacent.state, adjacent.move),
-    }));
-
-    const t5 = t4.sort((a, b) => b.h - a.h);
-
-    t5.forEach(adjacent => {
-      const collapsed = collapse(adjacent.state);
-      stack.push(collapsed);
-      cacheState(collapsed);
-    });
-
     // Cache adjacent vertices and push them onto the stack
-    // getValidPlacements(currentVertex)
-    //   .map(p => ({
-    //     move: p,
-    //     state: addQueenAtPosition(currentVertex, p),
-    //   }))
-    //   .filter(adjacent => !hasSeenState(adjacent.state))
-    //   .map(adjacent => ({
-    //     ...adjacent,
-    //     h: heuristic(adjacent.state, adjacent.move),
-    //   }))
-    //   .sort((a, b) => b.h - a.h)
-    //   .forEach(adjacent => {
-    //     const collapsed = collapse(adjacent.state);
-    //     stack.push(collapsed);
-    //     cacheState(collapsed);
-    //   });
+    getValidPlacements(currentVertex)
+      .map(p => ({
+        move: p,
+        state: addQueenAtPosition(currentVertex, p),
+      }))
+      .filter(adjacent => !hasSeenState(adjacent.state))
+      .map(adjacent => ({
+        ...adjacent,
+        h: heuristic(adjacent.state, adjacent.move),
+      }))
+      .sort((a, b) => b.h - a.h)
+      .forEach(adjacent => {
+        const collapsed = collapse(adjacent.state);
+        stack.push(collapsed);
+        cacheState(collapsed);
+      });
 
     if (ANIMATE) {
       render(currentVertex);
