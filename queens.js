@@ -5,22 +5,46 @@
 // - place 1 queen in each row, column, and region
 // - queens cannot be adjacent to each other (including diagonals)
 
-const HEIGHT = 8;
-const WIDTH = 8;
+const HEIGHT = 10;
+const WIDTH = 10;
+// const BOARD = [
+//   0, 0, 0, 0, 0, 0, 0, 0,
+//   0, 1, 1, 2, 0, 0, 0, 0,
+//   1, 1, 2, 2, 3, 4, 4, 0,
+//   5, 5, 2, 3, 3, 4, 0, 0,
+//   5, 5, 5, 5, 3, 6, 6, 0,
+//   5, 5, 5, 5, 5, 5, 6, 0,
+//   5, 5, 5, 5, 5, 5, 7, 7,
+//   5, 5, 5, 5, 5, 5, 5, 7,
+// ];
+// const BOARD = [
+//   0, 0, 0, 0, 0, 0, 0, 0, 0,
+//   1, 0, 0, 0, 0, 0, 0, 0, 0,
+//   1, 0, 0, 0, 0, 0, 2, 0, 0,
+//   1, 3, 3, 3, 3, 0, 2, 2, 2,
+//   1, 1, 4, 3, 3, 0, 5, 5, 5,
+//   6, 1, 4, 3, 3, 0, 5, 7, 7,
+//   6, 1, 4, 8, 3, 0, 5, 5, 7,
+//   6, 1, 4, 8, 3, 0, 5, 7, 7,
+//   6, 6, 4, 8, 8, 8, 5, 5, 5,
+// ];
 const BOARD = [
-  0, 0, 0, 0, 0, 0, 0, 0,
-  0, 1, 1, 2, 0, 0, 0, 0,
-  1, 1, 2, 2, 3, 4, 4, 0,
-  5, 5, 2, 3, 3, 4, 0, 0,
-  5, 5, 5, 5, 3, 6, 6, 0,
-  5, 5, 5, 5, 5, 5, 6, 0,
-  5, 5, 5, 5, 5, 5, 7, 7,
-  5, 5, 5, 5, 5, 5, 5, 7,
+  0, 1, 2, 2, 2, 3, 3, 3, 3, 3,
+  0, 1, 1, 2, 2, 3, 3, 3, 4, 4,
+  0, 1, 1, 2, 2, 5, 3, 3, 3, 4,
+  0, 0, 1, 2, 2, 5, 3, 3, 3, 4,
+  1, 0, 1, 2, 2, 5, 5, 3, 3, 4,
+  1, 1, 1, 2, 2, 6, 5, 3, 3, 4,
+  1, 1, 1, 1, 2, 6, 6, 4, 4, 4,
+  7, 2, 2, 2, 2, 9, 9, 4, 4, 4,
+  7, 2, 8, 2, 2, 9, 9, 4, 4, 9,
+  7, 7, 8, 8, 2, 9, 9, 9, 9, 9,
 ];
 const COLOURS = [
-  'red', 'green', 'blue', 'purple', 'orange', 'lime', 'yellow', 'navy'
+  'red', 'green', 'blue', 'purple', 'orange', 'lime', 'yellow', 'navy',
+  'pink', 'cyan', 'teal', 'magenta', 'maroon', 'olive', 'silver', 'gray',
 ];
-const MAX_ITERATIONS = 5000;
+const MAX_ITERATIONS = 1000000;
 
 // Convert between positions { x: number, y: number } and indices
 const pos = i => ({ x: i % WIDTH, y: Math.floor(i / WIDTH) });
@@ -130,6 +154,28 @@ function getValidPlacements(board) {
     .map(i => pos(i));
 }
 
+// Collapse any cells that must have a queen
+function collapse(board) {
+  let collapsed = cloneBoard(board);
+  const groupedValidPlacements = getValidPlacements(board)
+    .reduce(
+      (a, c) => ({
+        ...a,
+        [board[ind(c)].r]: [...(a[board[ind(c)].r] ?? []), c],
+      }),
+      {}
+    );
+
+  // If any region has one valid placement, then it must have a queen
+  Object.values(groupedValidPlacements).forEach(region => {
+    if (region.length === 1) {
+      collapsed = addQueenAtPosition(collapsed, region[0]);
+    }
+  });
+
+  return collapsed;
+}
+
 // State cache
 let seenStates = {};
 const hashState = state => state.map(({ r, q }) => `${r}_${q}`).join('|');
@@ -157,17 +203,46 @@ function solve(board) {
 
     // Cache adjacent vertices and push them onto the stack
     getValidPlacements(currentVertex)
-      .map(p => addQueenAtPosition(currentVertex, p))
-      .filter(adjacent => !hasSeenState(adjacent))
+      .map(p => ({
+        move: p,
+        state: addQueenAtPosition(currentVertex, p),
+      }))
+      .filter(adjacent => !hasSeenState(adjacent.state))
+      .map(adjacent => ({
+        ...adjacent,
+        h: heuristic(adjacent.state, adjacent.move),
+      }))
+      .sort((a, b) => b.h - a.h)
       .forEach(adjacent => {
-        stack.push(adjacent);
-        cacheState(adjacent);
+        const collapsed = collapse(adjacent.state);
+        stack.push(collapsed);
+        cacheState(collapsed);
       });
   }
 
   // Game is not solvable or we didn't search long enough
   console.log(`Not solvable`);
   return false;
+}
+
+// Heuristic function generates a score for a board state
+function heuristic(board, move) {
+  let score = 0;
+
+  // More constrained states are better
+  score += 1 / Math.max(getValidPlacements(board).length, 1);
+
+  // More placed queens are better
+  score += 10 * countQueens(board);
+
+  // Try to place queens in smaller regions first
+  const regionSizes = Object.values(groupByRegion(board)).map(
+    region => region.length
+  );
+  const regionThisMove = board[ind(move)].r;
+  score += 10 / regionSizes[regionThisMove];
+
+  return score;
 }
 
 // Dump a board state to the console

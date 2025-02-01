@@ -1,5 +1,5 @@
 // Solver for LinkedIn's Tango game
-// Instructions: TODO
+// Instructions: solve(BOARD)
 // Rules:
 // - place suns ('s') and moons ('m') in each cell
 // - no more than 2 suns or moons can be horizontally or vertically adjacent
@@ -9,17 +9,57 @@
 
 const HEIGHT = 6;
 const WIDTH = 6;
+// const BOARD = [
+//   null, null, null, 'm', null, null,
+//   null, null, null, null, null, null,
+//   null, null, null, null, null, 'm',
+//   'm', null, null, null, null, null,
+//   's', null, null, null, null, null,
+//   'm', 's', 'm', null, null, null,
+// ];
 const BOARD = [
-  null, null, null, 'm', null, null,
-  null, null, null, null, null, null,
-  null, null, null, null, null, 'm',
-  'm', null, null, null, null, null,
-  's', null, null, null, null, null,
-  'm', 's', 'm', null, null, null,
+  null, null, 's', 'm', null, null,
+  null, 's', null, null, null, null,
+  'm', null, null, null, null, 's',
+  's', null, null, null, null, 'm',
+  null, null, null, null, 's', null,
+  null, null, 'm', 'm', null, null,
 ];
+// const CONSTRAINTS = [
+//   {
+//     type: 'equals',
+//     a: { x: 4, y: 0 },
+//     b: { x: 5, y: 0 },
+//   },
+//   {
+//     type: 'opposites',
+//     a: { x: 5, y: 0 },
+//     b: { x: 5, y: 1 },
+//   },
+//   {
+//     type: 'equals',
+//     a: { x: 3, y: 1 },
+//     b: { x: 3, y: 2 },
+//   },
+//   {
+//     type: 'opposites',
+//     a: { x: 3, y: 2 },
+//     b: { x: 4, y: 2 },
+//   },
+//   {
+//     type: 'equals',
+//     a: { x: 1, y: 3 },
+//     b: { x: 2, y: 3 },
+//   },
+//   {
+//     type: 'equals',
+//     a: { x: 2, y: 3 },
+//     b: { x: 2, y: 4 },
+//   },
+// ];
 const CONSTRAINTS = [
   {
-    type: 'equals',
+    type: 'opposites',
     a: { x: 4, y: 0 },
     b: { x: 5, y: 0 },
   },
@@ -29,28 +69,18 @@ const CONSTRAINTS = [
     b: { x: 5, y: 1 },
   },
   {
-    type: 'equals',
-    a: { x: 3, y: 1 },
-    b: { x: 3, y: 2 },
+    type: 'opposites',
+    a: { x: 0, y: 4 },
+    b: { x: 0, y: 5 },
   },
   {
     type: 'opposites',
-    a: { x: 3, y: 2 },
-    b: { x: 4, y: 2 },
-  },
-  {
-    type: 'equals',
-    a: { x: 1, y: 3 },
-    b: { x: 2, y: 3 },
-  },
-  {
-    type: 'equals',
-    a: { x: 2, y: 3 },
-    b: { x: 2, y: 4 },
+    a: { x: 0, y: 5 },
+    b: { x: 1, y: 5 },
   },
 ];
 const MAX_ITERATIONS = 10000;
-const ANIMATE = true;
+const ANIMATE = false;
 
 // Convert between positions { x: number, y: number } and indices
 const pos = i => ({ x: i % WIDTH, y: Math.floor(i / WIDTH) });
@@ -203,6 +233,7 @@ function getValidMoves(board) {
 function collapse(board) {
   let changed = false;
   let collapsed = cloneBoard(board);
+  const validMoves = getValidMoves(collapsed);
 
   // Collapse cells with only one possible value
   for (let i = 0; i < board.length; i++) {
@@ -212,11 +243,11 @@ function collapse(board) {
       continue;
     }
 
-    const validMoves = getValidMoves(collapsed).filter(
+    const validMovesThisPosition = validMoves.filter(
       m => m.p.x === p.x && m.p.y === p.y
     );
-    if (validMoves.length === 1) {
-      collapsed = addValueAtPosition(collapsed, p, validMoves[0].v);
+    if (validMovesThisPosition.length === 1) {
+      collapsed = addValueAtPosition(collapsed, p, validMovesThisPosition[0].v);
       changed = true;
     }
   }
@@ -294,7 +325,7 @@ async function solve(board) {
 
 // Apply a heuristic to a board state and a move
 function heuristic(board, move) {
-  let score = Math.random();
+  let score = 0;//Math.random();
 
   // Make moves in constrained positions first
   for (const constraint of CONSTRAINTS) {
