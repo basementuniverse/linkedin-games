@@ -79,7 +79,7 @@ const CONSTRAINTS = [
     b: { x: 1, y: 5 },
   },
 ];
-const MAX_ITERATIONS = 10000;
+const MAX_ITERATIONS = 100000;
 const ANIMATE = false;
 
 // Convert between positions { x: number, y: number } and indices

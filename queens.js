@@ -5,18 +5,18 @@
 // - place 1 queen in each row, column, and region
 // - queens cannot be adjacent to each other (including diagonals)
 
-const HEIGHT = 10;
-const WIDTH = 10;
-// const BOARD = [
-//   0, 0, 0, 0, 0, 0, 0, 0,
-//   0, 1, 1, 2, 0, 0, 0, 0,
-//   1, 1, 2, 2, 3, 4, 4, 0,
-//   5, 5, 2, 3, 3, 4, 0, 0,
-//   5, 5, 5, 5, 3, 6, 6, 0,
-//   5, 5, 5, 5, 5, 5, 6, 0,
-//   5, 5, 5, 5, 5, 5, 7, 7,
-//   5, 5, 5, 5, 5, 5, 5, 7,
-// ];
+const HEIGHT = 8;
+const WIDTH = 8;
+const BOARD = [
+  0, 0, 0, 0, 0, 0, 0, 0,
+  0, 1, 1, 2, 0, 0, 0, 0,
+  1, 1, 2, 2, 3, 4, 4, 0,
+  5, 5, 2, 3, 3, 4, 0, 0,
+  5, 5, 5, 5, 3, 6, 6, 0,
+  5, 5, 5, 5, 5, 5, 6, 0,
+  5, 5, 5, 5, 5, 5, 7, 7,
+  5, 5, 5, 5, 5, 5, 5, 7,
+];
 // const BOARD = [
 //   0, 0, 0, 0, 0, 0, 0, 0, 0,
 //   1, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -28,23 +28,24 @@ const WIDTH = 10;
 //   6, 1, 4, 8, 3, 0, 5, 7, 7,
 //   6, 6, 4, 8, 8, 8, 5, 5, 5,
 // ];
-const BOARD = [
-  0, 1, 2, 2, 2, 3, 3, 3, 3, 3,
-  0, 1, 1, 2, 2, 3, 3, 3, 4, 4,
-  0, 1, 1, 2, 2, 5, 3, 3, 3, 4,
-  0, 0, 1, 2, 2, 5, 3, 3, 3, 4,
-  1, 0, 1, 2, 2, 5, 5, 3, 3, 4,
-  1, 1, 1, 2, 2, 6, 5, 3, 3, 4,
-  1, 1, 1, 1, 2, 6, 6, 4, 4, 4,
-  7, 2, 2, 2, 2, 9, 9, 4, 4, 4,
-  7, 2, 8, 2, 2, 9, 9, 4, 4, 9,
-  7, 7, 8, 8, 2, 9, 9, 9, 9, 9,
-];
+// const BOARD = [
+//   0, 1, 2, 2, 2, 3, 3, 3, 3, 3,
+//   0, 1, 1, 2, 2, 3, 3, 3, 4, 4,
+//   0, 1, 1, 2, 2, 5, 3, 3, 3, 4,
+//   0, 0, 1, 2, 2, 5, 3, 3, 3, 4,
+//   1, 0, 1, 2, 2, 5, 5, 3, 3, 4,
+//   1, 1, 1, 2, 2, 6, 5, 3, 3, 4,
+//   1, 1, 1, 1, 2, 6, 6, 4, 4, 4,
+//   7, 2, 2, 2, 2, 9, 9, 4, 4, 4,
+//   7, 2, 8, 2, 2, 9, 9, 4, 4, 9,
+//   7, 7, 8, 8, 2, 9, 9, 9, 9, 9,
+// ];
 const COLOURS = [
   'red', 'green', 'blue', 'purple', 'orange', 'lime', 'yellow', 'navy',
   'pink', 'cyan', 'teal', 'magenta', 'maroon', 'olive', 'silver', 'gray',
 ];
-const MAX_ITERATIONS = 1000000;
+const MAX_ITERATIONS = 100000;
+const ANIMATE = false;
 
 // Convert between positions { x: number, y: number } and indices
 const pos = i => ({ x: i % WIDTH, y: Math.floor(i / WIDTH) });
@@ -96,7 +97,7 @@ const getQueenArea = (board, q) => area(pos(q)).map(p => board[ind(p)]);
 const cloneBoard = board => [...board.map(({ r, q }) => ({ r, q }))];
 
 // Generate an unrolled list of cells from lists of regions and queen indices
-function generateBoard(regions, queens) {
+function generateBoard(regions, queens = []) {
   const queenMap = queens.reduce((a, c) => ({ ...a, [c]: true, }), {});
   return regions.map((r, i) => ({ r, q: !!queenMap[i] }));
 }
@@ -184,7 +185,7 @@ const hasSeenState = state => !!seenStates[hashState(state)];
 
 // Solve a game of queens
 // board => { r: number, q: boolean }[]
-function solve(board) {
+async function solve(board) {
   seenStates = {};
   const stack = [board];
   cacheState(board);
@@ -218,6 +219,11 @@ function solve(board) {
         stack.push(collapsed);
         cacheState(collapsed);
       });
+
+    if (ANIMATE) {
+      render(currentVertex);
+      await sleep(30);
+    }
   }
 
   // Game is not solvable or we didn't search long enough
@@ -230,32 +236,91 @@ function heuristic(board, move) {
   let score = 0;
 
   // More constrained states are better
-  score += 1 / Math.max(getValidPlacements(board).length, 1);
-
-  // More placed queens are better
-  score += 10 * countQueens(board);
+  score += 100 / Math.max(getValidPlacements(board).length, 1);
 
   // Try to place queens in smaller regions first
   const regionSizes = Object.values(groupByRegion(board)).map(
     region => region.length
   );
   const regionThisMove = board[ind(move)].r;
-  score += 10 / regionSizes[regionThisMove];
+  score += 100 / regionSizes[regionThisMove];
 
   return score;
 }
 
+// Helper function to sleep for a number of milliseconds
+async function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 // Dump a board state to the console
 function render(board) {
-  console.log(
-    range(HEIGHT).map(
-      y => board
-        .slice(WIDTH * y, WIDTH * (y + 1))
-        .map(cell => `%c${cell.q ? '👑' : '  '}`)
-        .join('')
-    ).join('\n'),
-    ...board.map(
-      cell => `background-color: ${COLOURS[cell.r % COLOURS.length]}`
-    )
-  );
+  const canvasWidth = 400;
+  const canvasHeight = 400;
+
+  const canvas = document.querySelector('#queens');
+  canvas.width = canvasWidth;
+  canvas.height = canvasHeight;
+  const context = canvas.getContext('2d');
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+
+  const cellSize = { x: canvasWidth / WIDTH, y: canvasHeight / HEIGHT };
+
+  // Regions
+  for (let y = 0; y < HEIGHT; y++) {
+    for (let x = 0; x < WIDTH; x++) {
+      context.fillStyle = COLOURS[board[ind({ x, y })].r % COLOURS.length];
+      context.fillRect(
+        x * cellSize.x,
+        y * cellSize.y,
+        cellSize.x,
+        cellSize.y
+      );
+    }
+  }
+
+  // Grid
+  context.strokeStyle = '#00000030';
+  for (let i = 0; i < WIDTH; i++) {
+    line(
+      context,
+      { x: i * cellSize.x, y: 0 },
+      { x: i * cellSize.x, y: canvasHeight }
+    );
+  }
+  for (let i = 0; i < HEIGHT; i++) {
+    line(
+      context,
+      { x: 0, y: i * cellSize.y },
+      { x: canvasWidth, y: i * cellSize.y }
+    );
+  }
+
+  // Queens
+  context.fillStyle = '#000000';
+  context.font = `${
+    Math.floor(Math.min(cellSize.x, cellSize.y) / 2)
+  }px sans-serif`;
+  for (let i = 0; i < WIDTH * HEIGHT; i++) {
+    const p = pos(i);
+    if (board[i].q) {
+      context.fillText(
+        '👑',
+        p.x * cellSize.x + cellSize.x / 2,
+        p.y * cellSize.y + cellSize.y / 2
+      );
+    }
+  }
 }
+
+function line(context, a, b) {
+  context.beginPath();
+  context.moveTo(a.x, a.y);
+  context.lineTo(b.x, b.y);
+  context.stroke();
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  render(generateBoard(BOARD));
+});
