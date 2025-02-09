@@ -6,7 +6,7 @@
 // - queens cannot be adjacent to each other (including diagonals)
 
 // -----------------------------------------------------------------------------
-// CONSTANTS
+// Sample games
 // -----------------------------------------------------------------------------
 
 const BOARD_1 = {
@@ -54,17 +54,60 @@ const BOARD_3 = {
     7, 7, 8, 8, 2, 9, 9, 9, 9, 9,
   ],
 };
+const BOARD_4 = {
+  width: 10,
+  height: 10,
+  cells: [
+    0, 1, 1, 1, 1, 1, 2, 2, 2, 2,
+    0, 0, 1, 1, 1, 1, 2, 3, 2, 2,
+    0, 0, 1, 1, 1, 1, 2, 3, 2, 2,
+    0, 0, 4, 4, 4, 3, 3, 3, 2, 2,
+    0, 0, 5, 5, 5, 5, 6, 3, 2, 2,
+    0, 0, 7, 6, 6, 6, 6, 3, 2, 2,
+    0, 0, 7, 7, 7, 7, 7, 3, 2, 2,
+    8, 8, 8, 8, 9, 9, 8, 8, 8, 2,
+    8, 8, 9, 9, 9, 8, 8, 8, 2, 2,
+    8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
+  ],
+};
+const BOARD_5 = {
+  width: 9,
+  height: 9,
+  cells: [
+    0, 0, 1, 1, 2, 3, 3, 3, 3,
+    0, 0, 1, 2, 2, 2, 4, 4, 3,
+    0, 0, 5, 5, 2, 5, 5, 4, 3,
+    0, 5, 5, 5, 5, 5, 5, 5, 3,
+    0, 5, 5, 5, 5, 5, 5, 5, 3,
+    0, 0, 5, 5, 5, 5, 5, 3, 3,
+    0, 0, 6, 5, 5, 5, 3, 3, 7,
+    0, 6, 6, 6, 5, 8, 3, 3, 7,
+    0, 0, 0, 6, 8, 8, 7, 7, 7,
+  ],
+};
+
+// -----------------------------------------------------------------------------
+// Constants & state
+// -----------------------------------------------------------------------------
+
+const CANVAS_WIDTH = 400;
+const CANVAS_HEIGHT = 400;
+
+let CURRENT_BOARD = initialiseBoard(BOARD_1);
+let ANIMATE = false;
+
+let canvas;
+let context;
 
 const COLOURS = [
   'red', 'green', 'blue', 'purple', 'orange', 'lime', 'yellow', 'navy',
   'pink', 'cyan', 'teal', 'magenta', 'maroon', 'olive', 'silver', 'gray',
 ];
-const MAX_SOLVER_ITERATIONS = 100000;
+const MAX_SOLVER_ITERATIONS = 1000000;
 const MAX_GENERATOR_ITERATIONS = 1000;
-const ANIMATE = false;
 
 // -----------------------------------------------------------------------------
-// UTILITIES
+// Utilities
 // -----------------------------------------------------------------------------
 
 // Convert between positions { x: number, y: number } and indices
@@ -105,6 +148,12 @@ const countQueens = cells => cells.filter(cell => cell.q).length;
 // Check if there is one queen in a set of cells
 const hasOneQueen = cells => countQueens(cells) === 1;
 
+// Check if there's a queen at a position
+const queenAtPosition = (board, p) => board.cells[ind(p, board.width)].q;
+
+// Check if a position is marked as invalid
+const positionIsMarked = (board, p) => board.cells[ind(p, board.width)].m;
+
 // Get a row of cells from a board
 const getRow = (board, y) => range(board.width).map(
   x => board.cells[ind({ x, y }, board.width)]
@@ -114,6 +163,10 @@ const getRow = (board, y) => range(board.width).map(
 const getColumn = (board, x) => range(board.height).map(
   y => board.cells[ind({ x, y }, board.width)]
 );
+
+// Get a list of cell indices for a given region
+const getRegionIndices = (board, r) => range(board.width * board.height)
+  .filter(i => board.cells[i].r === r);
 
 // Group cells by region
 // returns { [regionId: number]: cell[] }
@@ -138,7 +191,7 @@ const getQueenArea = (board, q) => mooreNeighbourhood(
 const cloneBoard = board => ({
   width: board.width,
   height: board.height,
-  cells: [...board.cells.map(({ r, q }) => ({ r, q }))],
+  cells: [...board.cells.map(({ r, q, m }) => ({ r, q, m }))],
 });
 
 // Check if a list of cells has unassigned regions
@@ -164,18 +217,18 @@ const shuffle = a => {
 };
 
 // -----------------------------------------------------------------------------
-// GAME LOGIC
+// Game logic
 // -----------------------------------------------------------------------------
 
-// Generate a board definition from a 1d array of regions and queen positions
-function initialiseBoard(width, height, regions, queens = []) {
+// Convert a board with a flattened array of regions into a valid board with
+// an array of cell objects
+function initialiseBoard(board, queens = []) {
   const queenMap = queens
     .map(q => ind(q, width))
     .reduce((a, c) => ({ ...a, [c]: true, }), {});
   return {
-    width,
-    height,
-    cells: regions.map((r, i) => ({ r, q: !!queenMap[i] })),
+    ...board,
+    cells: board.cells.map((r, i) => ({ r, q: !!queenMap[i], m: false })),
   };
 }
 
@@ -184,14 +237,32 @@ function resetBoard(board) {
   return {
     width: board.width,
     height: board.height,
-    cells: board.cells.map(cell => ({ ...cell, q: false })),
+    cells: board.cells.map(cell => ({ ...cell, q: false, m: false })),
   };
+}
+
+// Clear queens and markings at a given position
+function clearPosition(board, p) {
+  const clone = cloneBoard(board);
+  const i = ind(p, board.width);
+  clone.cells[i].q = false;
+  clone.cells[i].m = false;
+  return clone;
 }
 
 // Generate a new board with a queen at the given position
 function addQueenAtPosition(board, p) {
   const clone = cloneBoard(board);
   clone.cells[ind(p, board.width)].q = true;
+  return clone;
+}
+
+// Generate a board with the specified position marked as invalid
+function markInvalidPositions(board, pp) {
+  const clone = cloneBoard(board);
+  for (const p of pp) {
+    clone.cells[ind(p, board.width)].m = true;
+  }
   return clone;
 }
 
@@ -241,14 +312,124 @@ function getValidPlacements(board) {
     .map(i => pos(i, board.width));
 }
 
+// Get a list of positions where a queen cannot be placed
+function getInvalidPlacements(board) {
+  const invalid = [];
+
+  // If the playable cells in a region all occupy the same row or column, then
+  // the remaining cells in that row or column cannot have a queen
+  const cellsByUnoccupiedRegion = Object.fromEntries(
+    Object.entries(
+      board.cells.reduce(
+        (a, c, i) => ({
+          ...a,
+          [c.r]: [...(a[c.r] ?? []), { p: pos(i, board.width), ...c }],
+        }),
+        {}
+      )
+    )
+      .filter(([, cells]) => !cells.some(c => c.q))
+      .map(([region, cells]) => [region, cells.filter(c => !c.m)])
+  );
+  Object.values(cellsByUnoccupiedRegion).forEach(
+    cells => {
+      if (cells.every(c => c.p.x === cells[0].p.x)) {
+        const valid = cells.reduce((a, c) => ({ ...a, [c.p.y]: true }), {});
+        invalid.push(
+          ...range(board.height)
+            .map(y => ({ x: cells[0].p.x, y }))
+            .filter(p => !valid[p.y])
+        );
+      }
+
+      if (cells.every(c => c.p.y === cells[0].p.y)) {
+        const valid = cells.reduce((a, c) => ({ ...a, [c.p.x]: true }), {});
+        invalid.push(
+          ...range(board.width)
+            .map(x => ({ x, y: cells[0].p.y }))
+            .filter(p => !valid[p.x])
+        );
+      }
+    }
+  );
+
+  // If the playable cells in an unoccupied row or column are all of the same
+  // region, then all other cells in that region (i.e. not in the row or column)
+  // cannot have a queen
+  range(board.height)
+    .map(y => ({ row: y, cells: getRow(board, y) }))
+    .filter(
+      ({ cells }) => !cells.some(cell => cell.q)
+    )
+    .map(({ row, cells }) => ({
+      row,
+      regions: [...new Set(
+        cells
+          .filter(cell => !cell.m)
+          .map(cell => cell.r)
+      )],
+    }))
+    .filter(({ regions }) => regions.length === 1)
+    .forEach(({ row, regions }) => {
+      getRegionIndices(board, regions[0]).forEach(i => {
+        const p = pos(i, board.width);
+        if (p.y !== row) {
+          invalid.push(p);
+        }
+      });
+    });
+  range(board.width)
+    .map(x => ({ column: x, cells: getColumn(board, x) }))
+    .filter(
+      ({ cells }) => !cells.some(cell => cell.q)
+    )
+    .map(({ column, cells }) => ({
+      column,
+      regions: [...new Set(
+        cells
+          .filter(cell => !cell.m)
+          .map(cell => cell.r)
+      )],
+    }))
+    .filter(({ regions }) => regions.length === 1)
+    .forEach(({ column, regions }) => {
+      getRegionIndices(board, regions[0]).forEach(i => {
+        const p = pos(i, board.width);
+        if (p.x !== column) {
+          invalid.push(p);
+        }
+      });
+    });
+
+  return invalid.filter(p => !positionIsMarked(board, p));
+}
+
 // -----------------------------------------------------------------------------
-// SOLVER
+// Solver
 // -----------------------------------------------------------------------------
 
 // Collapse any cells that must have a queen
 function collapse(board) {
+  let changed = false;
   let collapsed = cloneBoard(board);
-  const groupedValidPlacements = getValidPlacements(board)
+  const validPlacements = getValidPlacements(board);
+  const validPlacementsGroupedByRow = validPlacements
+    .reduce(
+      (a, c) => ({
+        ...a,
+        [c.y]: [...(a[c.y] ?? []), c],
+      }),
+      {}
+    );
+  const validPlacementsGroupedByColumn = validPlacements
+    .reduce(
+      (a, c) => ({
+        ...a,
+        [c.x]: [...(a[c.x] ?? []), c],
+      }),
+      {}
+    );
+  const validPlacementsGroupedByRegion = validPlacements
     .reduce(
       (a, c) => ({
         ...a,
@@ -260,19 +441,45 @@ function collapse(board) {
       {}
     );
 
-  // If any region has one valid placement, then it must have a queen
-  Object.values(groupedValidPlacements).forEach(region => {
-    if (region.length === 1) {
-      collapsed = addQueenAtPosition(collapsed, region[0]);
+  // If any row has one valid placement, then it must have a queen
+  Object.values(validPlacementsGroupedByRow).forEach(row => {
+    if (row.length === 1) {
+      collapsed = addQueenAtPosition(collapsed, row[0]);
+      changed = true;
     }
   });
 
-  return collapsed;
+  // If any column has one valid placement, then it must have a queen
+  Object.values(validPlacementsGroupedByColumn).forEach(column => {
+    if (column.length === 1) {
+      collapsed = addQueenAtPosition(collapsed, column[0]);
+      changed = true;
+    }
+  });
+
+  // If any region has one valid placement, then it must have a queen
+  Object.values(validPlacementsGroupedByRegion).forEach(region => {
+    if (region.length === 1) {
+      collapsed = addQueenAtPosition(collapsed, region[0]);
+      changed = true;
+    }
+  });
+
+  // Mark positions that cannot have a queen
+  const invalidPlacements = getInvalidPlacements(collapsed);
+  if (invalidPlacements.length) {
+    collapsed = markInvalidPositions(collapsed, invalidPlacements);
+    changed = true;
+  }
+
+  return changed ? collapse(collapsed) : collapsed;
 }
 
 // State cache
 let seenStates = {};
-const hashState = state => state.cells.map(({ r, q }) => `${r}_${q}`).join('|');
+const hashState = state => state.cells
+  .map(({ r, q, m }) => `${r}_${q}_${m}`)
+  .join('|');
 const cacheState = state => { seenStates[hashState(state)] = true; }
 const hasSeenState = state => !!seenStates[hashState(state)];
 
@@ -286,7 +493,7 @@ async function solve(board) {
   // Iterate until the stack is empty...
   let iterations = 0;
   while (++iterations <= MAX_SOLVER_ITERATIONS && stack.length) {
-    const currentVertex = stack.pop();
+    let currentVertex = stack.pop();
 
     // If this is a winning state, then we're done
     if (checkWin(currentVertex)) {
@@ -309,8 +516,12 @@ async function solve(board) {
       .sort((a, b) => b.h - a.h)
       .forEach(adjacent => {
         const collapsed = collapse(adjacent.state);
-        stack.push(collapsed);
-        cacheState(collapsed);
+
+        // If the position is not marked, then add it to the stack
+        if (!positionIsMarked(collapsed, adjacent.move)) {
+          stack.push(collapsed);
+          cacheState(collapsed);
+        }
       });
 
     if (ANIMATE) {
@@ -342,7 +553,7 @@ function heuristic(board, move) {
 }
 
 // -----------------------------------------------------------------------------
-// RENDERING
+// Rendering
 // -----------------------------------------------------------------------------
 
 // Helper function to sleep for a number of milliseconds
@@ -352,19 +563,16 @@ async function sleep(ms) {
 
 // Dump a board state to the console
 function render(board) {
-  const canvasWidth = 400;
-  const canvasHeight = 400;
+  if (!canvas || !context) {
+    return;
+  }
 
-  const canvas = document.querySelector('#queens');
-  canvas.width = canvasWidth;
-  canvas.height = canvasHeight;
-  const context = canvas.getContext('2d');
   context.textAlign = 'center';
   context.textBaseline = 'middle';
 
   const cellSize = {
-    x: canvasWidth / board.width,
-    y: canvasHeight / board.height,
+    x: CANVAS_WIDTH / board.width,
+    y: CANVAS_HEIGHT / board.height,
   };
 
   // Regions
@@ -388,14 +596,14 @@ function render(board) {
     line(
       context,
       { x: i * cellSize.x, y: 0 },
-      { x: i * cellSize.x, y: canvasHeight }
+      { x: i * cellSize.x, y: CANVAS_HEIGHT }
     );
   }
   for (let i = 0; i < board.height; i++) {
     line(
       context,
       { x: 0, y: i * cellSize.y },
-      { x: canvasWidth, y: i * cellSize.y }
+      { x: CANVAS_WIDTH, y: i * cellSize.y }
     );
   }
 
@@ -414,6 +622,19 @@ function render(board) {
       );
     }
   }
+
+  // Marked cells
+  context.fillStyle = '#000000aa';
+  for (let i = 0; i < board.width * board.height; i++) {
+    const p = pos(i, board.width);
+    if (board.cells[i].m) {
+      context.fillText(
+        'x',
+        p.x * cellSize.x + cellSize.x / 2,
+        p.y * cellSize.y + cellSize.y / 2
+      );
+    }
+  }
 }
 
 function line(context, a, b) {
@@ -422,10 +643,6 @@ function line(context, a, b) {
   context.lineTo(b.x, b.y);
   context.stroke();
 }
-
-window.addEventListener('DOMContentLoaded', () => {
-  render(initialiseBoard(BOARD_1.width, BOARD_1.height, BOARD_1.cells));
-});
 
 // -----------------------------------------------------------------------------
 // Generator
@@ -485,6 +702,44 @@ function generateGame(size) {
   return {
     width: size,
     height: size,
-    cells: result.map(({ r, q }) => ({ r, q })),
+    cells: result.map(({ r, q }) => ({ r, q, m: false })),
   };
 }
+
+// -----------------------------------------------------------------------------
+// Interaction
+// -----------------------------------------------------------------------------
+
+window.addEventListener('DOMContentLoaded', () => {
+  canvas = document.querySelector('#queens');
+  canvas.width = CANVAS_WIDTH;
+  canvas.height = CANVAS_HEIGHT;
+  context = canvas.getContext('2d');
+
+  render(CURRENT_BOARD);
+
+  canvas.addEventListener('click', e => {
+    if (!CURRENT_BOARD) {
+      return;
+    }
+
+    const p = {
+      x: Math.floor(e.offsetX / (CANVAS_WIDTH / CURRENT_BOARD.width)),
+      y: Math.floor(e.offsetY / (CANVAS_HEIGHT / CURRENT_BOARD.height)),
+    };
+
+    if (!positionInBounds(p, CURRENT_BOARD.width, CURRENT_BOARD.height)) {
+      return;
+    }
+
+    if (queenAtPosition(CURRENT_BOARD, p)) {
+      CURRENT_BOARD = clearPosition(CURRENT_BOARD, p);
+    } else if (positionIsMarked(CURRENT_BOARD, p)) {
+      CURRENT_BOARD = addQueenAtPosition(clearPosition(CURRENT_BOARD, p), p);
+    } else {
+      CURRENT_BOARD = markInvalidPositions(clearPosition(CURRENT_BOARD, p), [p]);
+    }
+
+    render(CURRENT_BOARD);
+  });
+});
