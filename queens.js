@@ -100,10 +100,10 @@ let canvas;
 let context;
 
 const COLOURS = [
-  'red', 'green', 'blue', 'purple', 'orange', 'lime', 'yellow', 'navy',
+  'red', 'green', 'blue', 'purple', 'orange', 'lime', 'yellow', 'lightblue',
   'pink', 'cyan', 'teal', 'magenta', 'maroon', 'olive', 'silver', 'gray',
 ];
-const MAX_SOLVER_ITERATIONS = 1000000;
+const MAX_SOLVER_ITERATIONS = 100000;
 const MAX_GENERATOR_ITERATIONS = 1000;
 
 // -----------------------------------------------------------------------------
@@ -567,6 +567,8 @@ function render(board) {
     return;
   }
 
+  context.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
   context.textAlign = 'center';
   context.textBaseline = 'middle';
 
@@ -576,6 +578,8 @@ function render(board) {
   };
 
   // Regions
+  context.save();
+  context.globalAlpha = 0.3;
   for (let y = 0; y < board.height; y++) {
     for (let x = 0; x < board.width; x++) {
       context.fillStyle = COLOURS[
@@ -589,9 +593,11 @@ function render(board) {
       );
     }
   }
+  context.restore();
 
   // Grid
   context.strokeStyle = '#00000030';
+  context.lineWidth = 2;
   for (let i = 0; i < board.width; i++) {
     line(
       context,
@@ -635,6 +641,91 @@ function render(board) {
       );
     }
   }
+
+  // Invalid placements
+  context.save();
+  context.strokeStyle = 'red';
+  context.setLineDash([5, 5]);
+
+  // Check for multiple queens in a single column
+  range(board.width).forEach(x => {
+    if (countQueens(getColumn(board, x)) > 1) {
+      context.strokeRect(x * cellSize.x, 0, cellSize.x, CANVAS_HEIGHT);
+    }
+  });
+
+  // Check for multiple queens in a single row
+  range(board.height).forEach(y => {
+    if (countQueens(getRow(board, y)) > 1) {
+      context.strokeRect(0, y * cellSize.y, CANVAS_WIDTH, cellSize.y);
+    }
+  });
+
+  // Check for multiple queens in a single region
+  Object.entries(groupByRegion(board)).forEach(([region, cells]) => {
+    if (countQueens(cells) > 1) {
+      Object.values(
+        getRegionIndices(board, Number(region))
+          .map(i => pos(i, board.width))
+          .flatMap(p => [
+            { // Top edge
+              start: { x: p.x * cellSize.x, y: p.y * cellSize.y },
+              end: { x: (p.x + 1) * cellSize.x, y: p.y * cellSize.y },
+            },
+            { // Right edge
+              start: { x: (p.x + 1) * cellSize.x, y: p.y * cellSize.y },
+              end: { x: (p.x + 1) * cellSize.x, y: (p.y + 1) * cellSize.y },
+            },
+            { // Bottom edge
+              start: { x: p.x * cellSize.x, y: (p.y + 1) * cellSize.y },
+              end: { x: (p.x + 1) * cellSize.x, y: (p.y + 1) * cellSize.y },
+            },
+            { // Left edge
+              start: { x: p.x * cellSize.x, y: p.y * cellSize.y },
+              end: { x: p.x * cellSize.x, y: (p.y + 1) * cellSize.y },
+            },
+          ])
+          .reduce(
+            (a, c) => (h => ({
+              ...a,
+              [h]: { edge: c, count: (a[h]?.count ?? 0) + 1 },
+            }))(
+              `${Math.floor(c.start.x)}_${Math.floor(c.start.y)}_${Math.floor(c.end.x)}_${Math.floor(c.end.y)}`
+            ),
+            {}
+          )
+      )
+        .filter(({ count }) => count === 1)
+        .map(({ edge }) => edge)
+        .forEach(({ start, end }) => line(context, start, end));
+    }
+  });
+
+  // Check for queens adjacent to each other
+  getQueens(board).forEach(q => {
+    if (!hasOneQueen(getQueenArea(board, q))) {
+      const p = pos(q, board.width);
+      context.strokeRect(
+        (p.x - 1) * cellSize.x,
+        (p.y - 1) * cellSize.y,
+        cellSize.x * 3,
+        cellSize.y * 3
+      );
+    }
+  });
+  context.restore();
+
+  // Win state
+  if (checkWin(board)) {
+    context.save();
+    context.fillStyle = 'white';
+    context.globalAlpha = 0.2;
+    context.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    context.font = `${Math.floor(CANVAS_HEIGHT / 4)}px sans-serif`;
+    context.globalAlpha = 0.5;
+    context.fillText('🎉', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+    context.restore();
+  }
 }
 
 function line(context, a, b) {
@@ -650,23 +741,36 @@ function line(context, a, b) {
 
 // Generate a random game
 function generateGame(size) {
-  const result = range(size * size).map(() => ({ r: null, growthRate: 0 }));
+  let result;
 
   // Generate random positions, regions, and growth rates for the N queens
-  shuffle(range(size)).forEach((x, y) => {
-    const p = { x, y };
-    const i = ind(p, size);
+  // This method of using a shuffled array's values for x and indexes for y
+  // guarantees that each row and column will have 1 queen, but we still need
+  // to make sure no queens are directly adjacent
+  let noAdjacentQueens = false;
+  let shuffleIterations = 0;
+  do {
+    result = range(size * size).map(() => ({ r: null, growthRate: 0 }));
+    shuffle(range(size)).forEach((x, y) => {
+      const p = { x, y };
+      const i = ind(p, size);
 
-    result[i].r = y;
-    result[i].q = true;
-    result[i].growthRate = Math.random();
-  });
+      result[i].r = y;
+      result[i].q = true;
+      result[i].growthRate = Math.random();
+    });
+
+    const board = { width: size, height: size, cells: result };
+    noAdjacentQueens = getQueens(board).every(
+      q => hasOneQueen(getQueenArea(board, q))
+    );
+  } while (!noAdjacentQueens && shuffleIterations++ < MAX_GENERATOR_ITERATIONS);
 
   // Iterate until every cell has been assigned a region
-  let iterations = 0;
+  let solverIterations = 0;
   while (
     hasUnassignedRegions(result) &&
-    iterations++ < MAX_GENERATOR_ITERATIONS
+    solverIterations++ < MAX_GENERATOR_ITERATIONS
   ) {
     // Find all unassigned cells adjacent to assigned cells
     const unassigned = result
@@ -718,7 +822,10 @@ window.addEventListener('DOMContentLoaded', () => {
 
   render(CURRENT_BOARD);
 
-  canvas.addEventListener('click', e => {
+  let mouseDown = false;
+  canvas.addEventListener('mousedown', e => {
+    mouseDown = true;
+
     if (!CURRENT_BOARD) {
       return;
     }
@@ -741,5 +848,38 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     render(CURRENT_BOARD);
+  });
+  canvas.addEventListener('mouseup', () => {
+    mouseDown = false;
+  });
+  canvas.addEventListener('mouseout', () => {
+    mouseDown = false;
+  });
+  window.addEventListener('mouseout', () => {
+    mouseDown = false;
+  });
+  canvas.addEventListener('mousemove', e => {
+    if (!CURRENT_BOARD) {
+      return;
+    }
+
+    if (mouseDown) {
+      const p = {
+        x: Math.floor(e.offsetX / (CANVAS_WIDTH / CURRENT_BOARD.width)),
+        y: Math.floor(e.offsetY / (CANVAS_HEIGHT / CURRENT_BOARD.height)),
+      };
+
+      if (!positionInBounds(p, CURRENT_BOARD.width, CURRENT_BOARD.height)) {
+        return;
+      }
+
+      if (
+        !queenAtPosition(CURRENT_BOARD, p) &&
+        !positionIsMarked(CURRENT_BOARD, p)
+      ) {
+        CURRENT_BOARD = markInvalidPositions(CURRENT_BOARD, [p]);
+        render(CURRENT_BOARD);
+      }
+    }
   });
 });

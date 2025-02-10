@@ -11,6 +11,16 @@ canvas#queens {
 </style>
 <script src="queens.js" charset="UTF-8"></script>
 <canvas id="queens"></canvas>
+<br />
+<button onclick="CURRENT_BOARD = resetBoard(generateGame(8)); render(CURRENT_BOARD)">New Game (8)</button>
+<button onclick="CURRENT_BOARD = resetBoard(generateGame(9)); render(CURRENT_BOARD)">New Game (9)</button>
+<button onclick="CURRENT_BOARD = resetBoard(generateGame(10)); render(CURRENT_BOARD)">New Game (10)</button>
+<button onclick="CURRENT_BOARD = resetBoard(generateGame(11)); render(CURRENT_BOARD)">New Game (11)</button>
+<button onclick="CURRENT_BOARD = resetBoard(generateGame(12)); render(CURRENT_BOARD)">New Game (12)</button>
+<br />
+<button onclick="CURRENT_BOARD = resetBoard(CURRENT_BOARD); render(CURRENT_BOARD)">Reset</button>
+<button onclick="ANIMATE = false; solve(CURRENT_BOARD)">Solve</button>
+<button onclick="ANIMATE = true; solve(CURRENT_BOARD)">Solve (animated)</button>
 <ol>
   <li>Open devtools (F12)</li>
   <li><code>CURRENT_BOARD = generateGame(10)</code></li>
