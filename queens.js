@@ -93,18 +93,16 @@ const BOARD_5 = {
 const CANVAS_WIDTH = 400;
 const CANVAS_HEIGHT = 400;
 
-let CURRENT_BOARD = initialiseBoard(BOARD_1);
-let ANIMATE = false;
-
-let canvas;
-let context;
-
 const COLOURS = [
   'red', 'green', 'blue', 'purple', 'orange', 'lime', 'yellow', 'lightblue',
   'pink', 'cyan', 'teal', 'magenta', 'maroon', 'olive', 'silver', 'gray',
 ];
+
 const MAX_SOLVER_ITERATIONS = 100000;
 const MAX_GENERATOR_ITERATIONS = 1000;
+
+let CURRENT_BOARD = initialiseBoard(BOARD_1);
+let ANIMATE = false;
 
 // -----------------------------------------------------------------------------
 // Utilities
@@ -187,13 +185,6 @@ const getQueenArea = (board, q) => mooreNeighbourhood(
   board.height
 ).map(p => board.cells[ind(p, board.width)]);
 
-// Clone a board state
-const cloneBoard = board => ({
-  width: board.width,
-  height: board.height,
-  cells: [...board.cells.map(({ r, q, m }) => ({ r, q, m }))],
-});
-
 // Check if a list of cells has unassigned regions
 const hasUnassignedRegions = cells => cells.some(cell => cell.r === null);
 
@@ -215,6 +206,11 @@ const shuffle = a => {
   }
   return a;
 };
+
+// Helper function to sleep for a number of milliseconds
+async function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 // -----------------------------------------------------------------------------
 // Game logic
@@ -238,6 +234,15 @@ function resetBoard(board) {
     width: board.width,
     height: board.height,
     cells: board.cells.map(cell => ({ ...cell, q: false, m: false })),
+  };
+}
+
+// Clone a board state
+function cloneBoard(board) {
+  return {
+    width: board.width,
+    height: board.height,
+    cells: [...board.cells.map(({ r, q, m }) => ({ r, q, m }))],
   };
 }
 
@@ -484,7 +489,6 @@ const cacheState = state => { seenStates[hashState(state)] = true; }
 const hasSeenState = state => !!seenStates[hashState(state)];
 
 // Solve a game of queens
-// board => { r: number, q: boolean }[]
 async function solve(board) {
   seenStates = {};
   const stack = [board];
@@ -556,10 +560,8 @@ function heuristic(board, move) {
 // Rendering
 // -----------------------------------------------------------------------------
 
-// Helper function to sleep for a number of milliseconds
-async function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
+let canvas;
+let context;
 
 // Dump a board state to the console
 function render(board) {
@@ -719,11 +721,12 @@ function render(board) {
   if (checkWin(board)) {
     context.save();
     context.fillStyle = 'white';
-    context.globalAlpha = 0.2;
+    context.globalAlpha = 0.3;
     context.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    context.font = `${Math.floor(CANVAS_HEIGHT / 4)}px sans-serif`;
-    context.globalAlpha = 0.5;
-    context.fillText('🎉', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+    context.font = `${Math.floor(CANVAS_HEIGHT * 0.8)}px sans-serif`;
+    context.fillStyle = 'green';
+    context.globalAlpha = 0.2;
+    context.fillText('✔', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
     context.restore();
   }
 }
@@ -750,6 +753,10 @@ function generateGame(size) {
   let noAdjacentQueens = false;
   let shuffleIterations = 0;
   do {
+    if (shuffleIterations >= MAX_GENERATOR_ITERATIONS) {
+      throw new Error('Failed to generate a valid board');
+    }
+
     result = range(size * size).map(() => ({ r: null, growthRate: 0 }));
     shuffle(range(size)).forEach((x, y) => {
       const p = { x, y };
@@ -772,6 +779,10 @@ function generateGame(size) {
     hasUnassignedRegions(result) &&
     solverIterations++ < MAX_GENERATOR_ITERATIONS
   ) {
+    if (solverIterations >= MAX_GENERATOR_ITERATIONS) {
+      throw new Error('Failed to generate a valid board');
+    }
+
     // Find all unassigned cells adjacent to assigned cells
     const unassigned = result
       .map((cell, i) => ({ ...cell, i }))
@@ -822,6 +833,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   render(CURRENT_BOARD);
 
+  // Mouse input
   let mouseDown = false;
   canvas.addEventListener('mousedown', e => {
     mouseDown = true;
@@ -883,3 +895,17 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   });
 });
+
+// Buttons
+function handleNewGameClick(n) {
+  CURRENT_BOARD = resetBoard(generateGame(n));
+  render(CURRENT_BOARD);
+}
+function handleResetClick() {
+  CURRENT_BOARD = resetBoard(CURRENT_BOARD);
+  render(CURRENT_BOARD);
+}
+function handleSolveClick(a) {
+  ANIMATE = a;
+  solve(CURRENT_BOARD);
+}
