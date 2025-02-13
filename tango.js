@@ -101,8 +101,8 @@ const MAX_SOLVER_ITERATIONS = 100000;
 const MAX_GENERATOR_ITERATIONS = 50;
 const MAX_GENERATOR_SOLVER_ITERATIONS = 100;
 const DEFAULT_GENERATOR_OPTIONS = {
-  minInitialCells: 2,
-  maxInitialCells: 10,
+  minInitialCells: 4,
+  maxInitialCells: 16,
   minConstraints: 4,
   maxConstraints: 16,
   allowConstraintsOnInitialCells: true,
@@ -414,7 +414,7 @@ async function solve(
         return true;
       }
 
-      return currentVertex;
+      return [currentVertex, iterations];
     }
 
     // Cache adjacent vertices and push them onto the stack
@@ -458,8 +458,10 @@ async function solve(
   // Game is not solvable or we didn't search long enough
   if (output) {
     console.log(`Failed to solve`);
+    return false;
   }
-  return false;
+
+  return [null, -1];
 }
 
 // Apply a heuristic to a board state and a move
@@ -786,47 +788,106 @@ async function generateGame(size, options) {
     }
 
     result = initialiseBoard(result);
-    result = await solve(result, MAX_GENERATOR_SOLVER_ITERATIONS, false);
+    [result] = await solve(result, MAX_GENERATOR_SOLVER_ITERATIONS, false);
     solvable = !!result;
   } while (iterations++ < MAX_GENERATOR_ITERATIONS && !solvable);
   ANIMATE = originalAnimate;
 
   // Randomly add constraints
-  shuffle(
-    cartesian(range(size), range(size), range(size), range(size))
-      .map(([x1, y1, x2, y2]) => ({ a: { x: x1, y: y1 }, b: { x: x2, y: y2 } }))
-      .filter(({ a, b }) => manhattanDistance(a, b) === 1)
-      .filter(({ a, b }) => (
-        actualOptions.allowConstraintsOnInitialCells
-          ? (
-            !result.initialCells.includes(ind(a, size)) ||
-            !result.initialCells.includes(ind(b, size))
-          )
-          : (
-            !result.initialCells.includes(ind(a, size)) &&
-            !result.initialCells.includes(ind(b, size))
-          )
-      ))
-  ).slice(
-    0,
-    randomInt(actualOptions.minConstraints, actualOptions.maxConstraints)
-  ).forEach(({ a, b }) => {
-    const currentA = result.cells[ind(a, size)];
-    const currentB = result.cells[ind(b, size)];
-    result.constraints.push({
-      type: currentA === currentB ? 'equals' : 'opposites',
-      a,
-      b,
-    });
-  });
+  const interestingResults = [];
+  for (let i = 0; i < MAX_GENERATOR_ITERATIONS; i++) {
+    const current = resetBoard(cloneBoard(result));
 
-  // Reset the board, leaving initial cells and constraints intact
-  return resetBoard(result);
+    shuffle(
+      cartesian(range(size), range(size), range(size), range(size))
+        .map(([x1, y1, x2, y2]) => ({ a: { x: x1, y: y1 }, b: { x: x2, y: y2 } }))
+        .filter(({ a, b }) => manhattanDistance(a, b) === 1)
+        .filter(({ a, b }) => (
+          actualOptions.allowConstraintsOnInitialCells
+            ? (
+              !current.initialCells.includes(ind(a, size)) ||
+              !current.initialCells.includes(ind(b, size))
+            )
+            : (
+              !current.initialCells.includes(ind(a, size)) &&
+              !current.initialCells.includes(ind(b, size))
+            )
+        ))
+    ).slice(
+      0,
+      randomInt(actualOptions.minConstraints, actualOptions.maxConstraints)
+    ).forEach(({ a, b }) => {
+      const currentA = current.cells[ind(a, size)];
+      const currentB = current.cells[ind(b, size)];
+      current.constraints.push({
+        type: currentA === currentB ? 'equals' : 'opposites',
+        a,
+        b,
+      });
+    });
+
+    [, iterations] = await solve(
+      current,
+      MAX_GENERATOR_SOLVER_ITERATIONS,
+      false
+    );
+
+    if (iterations > 0) {
+      interestingResults.push({ board: resetBoard(current), iterations });
+    }
+  }
+
+  if (!interestingResults.length) {
+    throw new Error('Failed to generate a valid board');
+  }
+
+  interestingResults.sort((a, b) => a.iterations - b.iterations);
+  console.log('found', interestingResults);
+  return interestingResults.shift().board;
 }
 
 // -----------------------------------------------------------------------------
 // Interaction
 // -----------------------------------------------------------------------------
+
+const history = (() => {
+  let history = [];
+  let pointer = -1;
+
+  return {
+    clear(start = 0) {
+      if (start === 0) {
+        history = [];
+        pointer = -1;
+      } else {
+        history = history.slice(0, start);
+        pointer = history.length - 1;
+      }
+    },
+    push(state, f) {
+      if (pointer < history.length - 1) {
+        this.clear(pointer + 1);
+      }
+      history.push(cloneBoard(state));
+      pointer = history.length - 1;
+      f && (CURRENT_BOARD = f(state));
+    },
+    undo() {
+      if (pointer >= 1) {
+        pointer--;
+        CURRENT_BOARD = history[pointer];
+        render(CURRENT_BOARD);
+      }
+    },
+    redo() {
+      if (pointer < history.length - 1) {
+        pointer++;
+        CURRENT_BOARD = history[pointer];
+        render(CURRENT_BOARD);
+      }
+    },
+  };
+})();
 
 window.addEventListener('DOMContentLoaded', () => {
   canvas = document.querySelector('#tango');
@@ -835,6 +896,7 @@ window.addEventListener('DOMContentLoaded', () => {
   context = canvas.getContext('2d');
 
   render(CURRENT_BOARD);
+  history.push(CURRENT_BOARD);
 
   // Mouse input
   canvas.addEventListener('click', e => {
@@ -871,6 +933,7 @@ window.addEventListener('DOMContentLoaded', () => {
         break;
     }
 
+    history.push(CURRENT_BOARD);
     render(CURRENT_BOARD);
   });
 });
@@ -878,16 +941,27 @@ window.addEventListener('DOMContentLoaded', () => {
 
 // Buttons
 function handleNewGameClick(n) {
-  const game = generateGame(n).then(game => {
+  history.clear();
+  generateGame(n).then(game => {
     CURRENT_BOARD = resetBoard(game);
+    history.push(CURRENT_BOARD);
     render(CURRENT_BOARD);
   });
 }
 function handleResetClick() {
+  history.clear();
   CURRENT_BOARD = resetBoard(CURRENT_BOARD);
+  history.push(CURRENT_BOARD);
   render(CURRENT_BOARD);
 }
 function handleSolveClick(a) {
   ANIMATE = a;
   solve(CURRENT_BOARD);
+  history.push(CURRENT_BOARD);
+}
+function handleUndoClick() {
+  history.undo();
+}
+function handleRedoClick() {
+  history.redo();
 }

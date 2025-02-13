@@ -618,13 +618,13 @@ function render(board) {
   // Queens
   context.fillStyle = '#000000';
   context.font = `${
-    Math.floor(Math.min(cellSize.x, cellSize.y) / 2)
+    Math.floor(Math.min(cellSize.x, cellSize.y) / 1.5)
   }px sans-serif`;
   for (let i = 0; i < board.width * board.height; i++) {
     const p = pos(i, board.width);
     if (board.cells[i].q) {
       context.fillText(
-        '👑',
+        '♛',
         p.x * cellSize.x + cellSize.x / 2,
         p.y * cellSize.y + cellSize.y / 2
       );
@@ -632,7 +632,10 @@ function render(board) {
   }
 
   // Marked cells
-  context.fillStyle = '#000000aa';
+  context.fillStyle = '#00000070';
+  context.font = `${
+    Math.floor(Math.min(cellSize.x, cellSize.y) / 3)
+  }px sans-serif`;
   for (let i = 0; i < board.width * board.height; i++) {
     const p = pos(i, board.width);
     if (board.cells[i].m) {
@@ -825,6 +828,45 @@ function generateGame(size) {
 // Interaction
 // -----------------------------------------------------------------------------
 
+const history = (() => {
+  let history = [];
+  let pointer = -1;
+
+  return {
+    clear(start = 0) {
+      if (start === 0) {
+        history = [];
+        pointer = -1;
+      } else {
+        history = history.slice(0, start);
+        pointer = history.length - 1;
+      }
+    },
+    push(state, f) {
+      if (pointer < history.length - 1) {
+        this.clear(pointer + 1);
+      }
+      history.push(cloneBoard(state));
+      pointer = history.length - 1;
+      f && (CURRENT_BOARD = f(state));
+    },
+    undo() {
+      if (pointer >= 1) {
+        pointer--;
+        CURRENT_BOARD = history[pointer];
+        render(CURRENT_BOARD);
+      }
+    },
+    redo() {
+      if (pointer < history.length - 1) {
+        pointer++;
+        CURRENT_BOARD = history[pointer];
+        render(CURRENT_BOARD);
+      }
+    },
+  };
+})();
+
 window.addEventListener('DOMContentLoaded', () => {
   canvas = document.querySelector('#queens');
   canvas.width = CANVAS_WIDTH;
@@ -832,6 +874,7 @@ window.addEventListener('DOMContentLoaded', () => {
   context = canvas.getContext('2d');
 
   render(CURRENT_BOARD);
+  history.push(CURRENT_BOARD);
 
   // Mouse input
   let mouseDown = false;
@@ -859,6 +902,7 @@ window.addEventListener('DOMContentLoaded', () => {
       CURRENT_BOARD = markInvalidPositions(clearPosition(CURRENT_BOARD, p), [p]);
     }
 
+    history.push(CURRENT_BOARD);
     render(CURRENT_BOARD);
   });
   canvas.addEventListener('mouseup', () => {
@@ -890,6 +934,7 @@ window.addEventListener('DOMContentLoaded', () => {
         !positionIsMarked(CURRENT_BOARD, p)
       ) {
         CURRENT_BOARD = markInvalidPositions(CURRENT_BOARD, [p]);
+        history.push(CURRENT_BOARD);
         render(CURRENT_BOARD);
       }
     }
@@ -898,14 +943,25 @@ window.addEventListener('DOMContentLoaded', () => {
 
 // Buttons
 function handleNewGameClick(n) {
+  history.clear();
   CURRENT_BOARD = resetBoard(generateGame(n));
+  history.push(CURRENT_BOARD);
   render(CURRENT_BOARD);
 }
 function handleResetClick() {
+  history.clear();
   CURRENT_BOARD = resetBoard(CURRENT_BOARD);
+  history.push(CURRENT_BOARD);
   render(CURRENT_BOARD);
 }
 function handleSolveClick(a) {
   ANIMATE = a;
   solve(CURRENT_BOARD);
+  history.push(CURRENT_BOARD);
+}
+function handleUndoClick() {
+  history.undo();
+}
+function handleRedoClick() {
+  history.redo();
 }
